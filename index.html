@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ディスカッション切り口提案AI（女性技術者 × 未来の職場づくり）</title>
+<title>議論テーマ提案AI（女性技術者 × 未来の職場づくり）</title>
 <style>
   :root{
     --bg:#0f1220; --panel:#16192b; --ink:#f3f5ff; --muted:#a8b0d8; --accent:#6ee7b7; --accent-2:#8ab4ff;
@@ -67,8 +67,8 @@
   <header>
     <div class="logo">AI</div>
     <div class="title">
-      <h1>ディスカッション切り口提案AI（女性技術者 × 未来の職場づくり）</h1>
-      <!-- <small class="muted">1ファイル完結版：HTML + CSS + JS（Gemini API 使用）。APIキーはブラウザ内のみで使用し保存しない。</small> -->
+      <h1>議論テーマ提案AI（女性技術者 × 未来の職場づくり）</h1>
+      <small class="muted">1ファイル完結版：HTML + CSS + JS（Gemini API 使用）。APIキーはブラウザ内のみで使用し保存しない。</small>
     </div>
   </header>
 
@@ -114,7 +114,6 @@
     <div class="divider"></div>
     <div class="row">
       <button class="btn secondary" id="btnBackSetup">戻る</button>
-      <!-- ★追加：大テーマの再提案ボタン -->
       <button class="btn ghost" id="btnRegenThemes">
         <span class="spinner sr-only" id="spinRegenThemes"></span> 大テーマの再提案
       </button>
@@ -140,7 +139,7 @@
   <section id="view-final" class="panel" style="display:none">
     <div class="ok-banner">
       <div class="big">3) 最終表示</div>
-      <!-- <div class="hint">この内容で会合を開始できる。必要なら小テーマ再提案か大テーマ再選択で戻れる。</div> -->
+      <div class="hint">この内容で会合を開始できる。必要なら小テーマ再提案か大テーマ再選択で戻れる。</div>
     </div>
     <div class="final" id="finalRender" style="margin-top:12px"></div>
     <div class="divider"></div>
@@ -187,6 +186,19 @@ function step(i){
   for(let k=1;k<=5;k++){ const d=qs(`#dot-${k}`); if(!d) continue; d.classList.toggle('active', k<=i);}
 }
 
+/** ====== スクロール制御（最終表示遷移時にトップへ） ====== **/
+function scrollToTop() {
+  try {
+    // まず即時に上へ
+    window.scrollTo(0, 0);
+    // レイアウト後にもう一度（画面切替直後のズレ対策）
+    requestAnimationFrame(()=> window.scrollTo({ top: 0, behavior: 'smooth' }));
+    setTimeout(()=> window.scrollTo(0,0), 300);
+  } catch(e) {
+    // 失敗しても何もしない
+  }
+}
+
 /** ====== Gemini API 呼び出し（REST） ====== **/
 async function callGeminiJSON({apiKey, model, temperature, systemText, userText}){
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -211,7 +223,7 @@ function extractJSON(s){
 
 /** ====== プロンプト ====== **/
 const SYSTEM_CORE = `
-あなたは「議論起点ジェネレータAI」である。女性技術者が主役の会合で、冒頭に良質な切り口を提示する役割のみを担う。
+あなたは「議論テーマ提案AI」である。女性技術者が主役の会合で、冒頭に良質な切り口を提示する役割のみを担う。
 原則：心理的安全性、偏り回避、行動可能性。出力は厳密なJSONのみ。`;
 
 function promptOpeningAndTen(context){
@@ -388,7 +400,7 @@ qs("#btnBackSetup").addEventListener("click", ()=>{
   hide("#view-themes"); show("#view-setup"); step(1);
 });
 
-/* ★追加：大テーマの再提案 */
+/* 大テーマの再提案 */
 qs("#btnRegenThemes").addEventListener("click", async ()=>{
   qs("#spinRegenThemes").classList.remove("sr-only");
   overlay(true);
@@ -396,14 +408,14 @@ qs("#btnRegenThemes").addEventListener("click", async ()=>{
     const data = await callGeminiJSON({
       apiKey: STATE.apiKey,
       model: STATE.model,
-      temperature: Math.min(1.0, STATE.temp + 0.2), // 変化を少し増やす
+      temperature: Math.min(1.0, STATE.temp + 0.2),
       systemText: SYSTEM_CORE,
       userText: promptTenOnly(STATE.context)
     });
     const themes = Array.isArray(data.themes)? data.themes : [];
     if(themes.length!==10) throw new Error("大テーマが10件ではありません。");
     STATE.themes10 = themes;
-    renderThemes(); // 選択リセット・カウント更新を内包
+    renderThemes();
     toast("大テーマを再提案しました", true);
   }catch(err){
     toast("大テーマ再提案に失敗: "+err.message);
@@ -456,7 +468,10 @@ qs("#btnRegen").addEventListener("click", async ()=>{
 });
 
 qs("#btnOK").addEventListener("click", ()=>{
-  renderFinal(); hide("#view-details"); show("#view-final"); step(5);
+  renderFinal();
+  hide("#view-details"); show("#view-final"); step(5);
+  // ★ 最終表示に遷移したらトップへスクロール
+  scrollToTop();
 });
 qs("#btnRegen2").addEventListener("click", ()=>qs("#btnRegen").click());
 qs("#btnReselect2").addEventListener("click", ()=>{ hide("#view-final"); show("#view-themes"); step(3); });
@@ -476,11 +491,10 @@ step(1);
 
 <!--
 変更点:
-- モデル/創造性のUIを削除し、DEFAULT_MODEL/DEFAULT_TEMPで固定。
-- 最終画面のJSON表示を削除。
-- ★追加要件: 大テーマの再提案ボタン（btnRegenThemes）を実装。promptTenOnlyで10大テーマのみ再生成し、UIを更新。
-- Gemini API: https://ai.google.dev/api/generate-content
-- 本番はサーバープロキシ経由でキー秘匿推奨。
+- 最終表示（OK押下）時に scrollToTop() を呼び出し、遷移直後に画面最上部へ移動。
+- モデル/創造性のUIは非表示＆固定（DEFAULT_MODEL/DEFAULT_TEMP）。
+- 大テーマの再提案ボタン（btnRegenThemes）を実装済み。
+- 最終画面のJSON表示は非表示のまま。
 -->
 </body>
 </html>
