@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>議論テーマ設計サポート</title>
+    
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --primary-light: #f0f8ff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --light-gray: #f8f9fa;
+            --gray: #dee2e6;
+            --dark-gray: #343a40;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--light-gray);
+            color: var(--dark-gray);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        #app-container {
+            width: 100%;
+            max-width: 800px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .screen {
+            padding: 25px;
+            display: none; /* JavaScriptで表示を切り替え */
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        /* --- スタート画面 --- */
+        #screen-start {
+            text-align: center;
+        }
+        
+        .welcome-message {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+
+        /* --- ローディング --- */
+        .loading-overlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .loading-overlay.active {
+            display: flex;
+        }
+        .spinner {
+            border: 5px solid var(--gray);
+            border-top: 5px solid var(--primary-color);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* --- 大テーマ選択 --- */
+        #theme-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .theme-item {
+            display: block;
+            margin-bottom: 12px;
+        }
+        .theme-item label {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background-color: var(--primary-light);
+            border: 1px solid var(--gray);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s, box-shadow 0.2s;
+        }
+        .theme-item label:hover {
+            background-color: #e0f0ff;
+        }
+        .theme-item input[type="checkbox"] {
+            margin-right: 15px;
+            width: 20px;
+            height: 20px;
+        }
+        .theme-item input[type="checkbox"]:checked + span {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
+        #selection-feedback {
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+        }
+        #selection-feedback.error {
+            color: var(--danger-color);
+            font-weight: bold;
+        }
+
+        /* --- 小テーマ確認 --- */
+        .subtheme-container {
+            margin-bottom: 20px;
+        }
+        .subtheme-container h3 {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px 15px;
+            margin: 0 0 10px 0;
+            border-radius: 4px;
+        }
+        .subtheme-list {
+            list-style-type: disc;
+            padding-left: 25px;
+        }
+        .subtheme-list li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        /* --- 最終結果 --- */
+        #final-result-container {
+            background-color: var(--primary-light);
+            border: 1px solid var(--primary-color);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        /* --- ボタン共通 --- */
+        .button {
+            display: inline-block;
+            font-family: var(--font-family);
+            font-size: 1rem;
+            font-weight: 600;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            margin: 5px;
+        }
+        .button-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .button-primary:hover {
+            background-color: #0056b3;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .button-primary:disabled {
+            background-color: var(--secondary-color);
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .button-secondary {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        .button-secondary:hover {
+            background-color: #5a6268;
+        }
+        .button-warning {
+            background-color: var(--warning-color);
+            color: var(--dark-gray);
+        }
+        .button-warning:hover {
+            background-color: #e0a800;
+        }
+        
+        .button-group {
+            margin-top: 25px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+        .button-group .right {
+            margin-left: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <header>
+            <h1>未来の職場づくり：議論テーマ設計サポート</h1>
+        </header>
+
+        <div class="loading-overlay" id="loading-overlay">
+            <div class="spinner"></div>
+        </div>
+
+        <div id="screen-start" class="screen active">
+            <p class="welcome-message">
+                参加者の実体験を引き出し、未来に向けた建設的な対話を生み出すためのアジェンダ作成をお手伝いします。
+            </p>
+            <button id="btn-start" class="button button-primary">スタート</button>
+        </div>
+
+        <div id="screen-themes" class="screen">
+            <h2 id="initial-message"></h2>
+            <ul id="theme-list"></ul>
+            <div id="selection-feedback">5つのテーマを選択してください</div>
+            <div class="button-group">
+                <button id="btn-confirm-themes" class="button button-primary" disabled>小テーマを生成 (5/5)</button>
+            </div>
+        </div>
+
+        <div id="screen-subthemes" class="screen">
+            <h2>生成された小テーマ</h2>
+            <p>選択した大テーマに基づき、以下の小テーマ（議論の切り口）を提案します。これでよろしいですか？</p>
+            <div id="subtheme-results"></div>
+            <div class="button-group">
+                <div>
+                    <button id="btn-back-to-main" class="button button-secondary">大テーマを再選択</button>
+                    <button id="btn-retry-subthemes" class="button button-warning">小テーマを再提案</button>
+                </div>
+                <button id="btn-confirm-final" class="button button-primary right">OK (最終決定)</button>
+            </div>
+        </div>
+
+        <div id="screen-final" class="screen">
+            <h2>決定したディスカッション・テーマ</h2>
+            <p>以下のテーマで、活発な議論が生まれることを願っています。</p>
+            <div id="final-result-container"></div>
+            <div class="button-group">
+                <button id="btn-restart" class="button button-secondary">最初からやり直す</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- APIシミュレーション用データ ---
+        // 本来、このデータはAPIから動的に取得します。
+        // ここでは2パターン（通常用と再提案用）をハードコードしています。
+        const API_DATA_STORE = {
+            "1": {
+                title: "キャリアとスキル開発",
+                subthemes_1: ["キャリアパスの多様性", "学び直しの機会", "日々の業務を通じた成長実感", "スキル習得支援の公平性", "技術者としての市場価値"],
+                subthemes_2: ["専門職vs管理職以外の道", "育休・時短中のスキルアップデート支援", "ストレッチアサインメントと裁量権", "学習予算と時間の確保", "社外でも通用する専門性の構築"]
+            },
+            "2": {
+                title: "評価と昇進の透明性",
+                subthemes_1: ["評価プロセスの透明性", "「見えにくい貢献」の可視化", "昇進・昇格プロセスの納得感", "ライフイベントと評価", "未来の「成果」の定義"],
+                subthemes_2: ["評価基準の明確化とフィードバック", "サポート業務や後輩育成の評価", "昇進の意思決定プロセスの開示", "休職・時短復帰後のキャリアパス", "時間ではなくアウトプット重視の評価"]
+            },
+            "3": {
+                title: "ワークライフ・インテグレーション",
+                subthemes_1: ["柔軟な勤務時間", "柔軟な勤務場所", "「時間制約」へのチームの理解", "仕事と私生活の「境界線」", "両立支援制度の「使いやすさ」"],
+                subthemes_2: ["フルフレックスや中抜け制度", "リモートと出社の最適バランス", "子育て・介護中の突発対応", "「つながらない権利」の担保", "制度の認知度と取得しやすい雰囲気"]
+            },
+            "4": {
+                title: "組織風土と心理的安全性",
+                subthemes_1: ["「異論」を歓迎する文化", "失敗から学ぶプロセス", "チーム内の情報格差", "「暗黙のルール」の存在", "雑談や相互理解の機会"],
+                subthemes_2: ["会議で反対意見を表明できるか", "挑戦した結果の失敗の許容", "リモートと出社間の情報共有", "昔からの慣習の見直し", "1on1の質とチームビルディング"]
+            },
+            "5": {
+                title: "アンコンシャス・バイアス（無意識の偏見）",
+                subthemes_1: ["日々の業務での役割分担", "発言機会の偏り", "過小評価・過大評価", "「女性だから」というラベリング", "多様な視点の欠如"],
+                subthemes_2: ["お茶汲み・雑務の偏り", "会議で誰の意見が通りやすいか", "特定の属性への固定観念", "マイクロアグレッションの事例共有", "意思決定層の多様性"]
+            },
+            "6": {
+                title: "ロールモデルとメンターシップ",
+                subthemes_1: ["目標となる先輩の存在", "相談できるメンター制度", "多様なロールモデルの必要性", "身近なロールモデルの不足", "次世代の育成"],
+                subthemes_2: ["多様なキャリアを歩む先輩", "形式的でないメンタリング", "「自分らしい」ロールモデル", "社外メンターの活用", "スポンサーシップ（引き上げ）"]
+            },
+            "7": {
+                title: "ネットワーキングと情報アクセス",
+                subthemes_1: ["組織内外のつながり", "重要な情報へのアクセスしやすさ", "孤立の防止", "部門横断のコミュニケーション", "非公式な情報ネットワーク"],
+                subthemes_2: ["社内コミュニティの活性化", "キーパーソンへのアクセス", "リモートワーク下の孤立感", "他部門との連携", "「飲み会」以外の情報交換"]
+            },
+            "8": {
+                title: "技術とツールの活用",
+                subthemes_1: ["業務効率化ツールの導入", "コラボレーションツールの活用", "スキル習得を支援する環境", "ツール利用の格差", "DXと働きやすさ"],
+                subthemes_2: ["AIや自動化による負荷軽減", "リモートでの円滑な協業", "Eラーニングやサンドボックス環境", "ITリテラシーのサポート", "デジタル化による柔軟な働き方"]
+            },
+            "9": {
+                title: "健康とウェルビーイング",
+                subthemes_1: ["心身の健康維持のサポート", "ハラスメント防止と対策", "働きがいとモチベーション", "過度な業務負荷", "メンタルヘルスケア"],
+                subthemes_2: ["産業医やカウンセリング", "パワハラ・セクハラの相談窓口", "エンゲージメントの測定と改善", "長時間労働の是正", "心理的負担の軽減"]
+            },
+            "10": {
+                title: "インクルーシブな意思決定",
+                subthemes_1: ["会議での発言機会の均等性", "重要なプロジェクトへのアサイン", "リーダーシップの多様性", "意思決定プロセスの透明化", "マイノリティ意見の尊重"],
+                subthemes_2: ["誰が会議をファシリテートするか", "主要プロジェクトのメンバー選定", "従来のリーダー像にとらわれない登用", "「いつの間にか決まる」の防止", "少数意見を拾う仕組み"]
+            }
+        };
+
+        // --- DOM要素の取得 ---
+        const screens = document.querySelectorAll('.screen');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        
+        const btnStart = document.getElementById('btn-start');
+        
+        const screenThemes = document.getElementById('screen-themes');
+        const initialMessageEl = document.getElementById('initial-message');
+        const themeListEl = document.getElementById('theme-list');
+        const selectionFeedbackEl = document.getElementById('selection-feedback');
+        const btnConfirmThemes = document.getElementById('btn-confirm-themes');
+
+        const screenSubthemes = document.getElementById('screen-subthemes');
+        const subthemeResultsEl = document.getElementById('subtheme-results');
+        const btnBackToMain = document.getElementById('btn-back-to-main');
+        const btnRetrySubthemes = document.getElementById('btn-retry-subthemes');
+        const btnConfirmFinal = document.getElementById('btn-confirm-final');
+        
+        const screenFinal = document.getElementById('screen-final');
+        const finalResultContainerEl = document.getElementById('final-result-container');
+        const btnRestart = document.getElementById('btn-restart');
+
+        // --- 状態管理変数 ---
+        let selectedMainThemes = [];
+        let currentSubthemeVersion = 1; // 1 or 2 (再提案用)
+        let finalThemesData = {}; // 最終決定したデータを保持
+
+        // --- 関数 ---
+
+        /** 画面を表示する関数 */
+        function showScreen(screenId) {
+            screens.forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+        
+        /** ローディングを表示/非表示 */
+        function showLoading(isLoading) {
+            if (isLoading) {
+                loadingOverlay.classList.add('active');
+            } else {
+                loadingOverlay.classList.remove('active');
+            }
+        }
+
+        /** (シミュレート) API呼び出しを模倣する */
+        function fakeApiCall(duration) {
+            showLoading(true);
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    showLoading(false);
+                    resolve();
+                }, duration);
+            });
+        }
+
+        /** チェックボックスの選択状態を監視 */
+        function handleCheckboxChange() {
+            const checkedBoxes = document.querySelectorAll('#theme-list input[type="checkbox"]:checked');
+            const count = checkedBoxes.length;
+            
+            selectionFeedbackEl.textContent = `(${count}/5) 5つのテーマを選択してください`;
+            selectionFeedbackEl.classList.remove('error');
+
+            if (count === 5) {
+                btnConfirmThemes.disabled = false;
+                btnConfirmThemes.textContent = `小テーマを生成 (5/5)`;
+                selectionFeedbackEl.textContent = `5つ選択しました。決定ボタンを押してください。`;
+                // 5つ超えて選択できないようにする
+                const uncheckedBoxes = document.querySelectorAll('#theme-list input[type="checkbox"]:not(:checked)');
+                uncheckedBoxes.forEach(box => box.disabled = true);
+            } else if (count > 5) {
+                // 基本的にこのロジックには入らないはずだが、念のため
+                selectionFeedbackEl.textContent = `5つまでしか選択できません。`;
+                selectionFeedbackEl.classList.add('error');
+            } else {
+                btnConfirmThemes.disabled = true;
+                btnConfirmThemes.textContent = `小テーマを生成 (${count}/5)`;
+                // 制限を解除
+                const allBoxes = document.querySelectorAll('#theme-list input[type="checkbox"]');
+                allBoxes.forEach(box => box.disabled = false);
+            }
+        }
+
+        /** ステップ1: スタートボタン押下 */
+        async function startProcess() {
+            await fakeApiCall(1000); // APIから大テーマを取得するフリ
+            
+            // ステップ2の画面を構築
+            initialMessageEl.textContent = "このテーマで議論すべき『10個の大テーマ』を提案します。特に深く掘り下げたい、重要だと思うテーマを5つ選んでください。";
+            themeListEl.innerHTML = ""; // 初期化
+            
+            for (const [id, data] of Object.entries(API_DATA_STORE)) {
+                const li = document.createElement('li');
+                li.className = 'theme-item';
+                li.innerHTML = `
+                    <label>
+                        <input type="checkbox" value="${id}" name="main_theme">
+                        <span>${data.title}</span>
+                    </label>
+                `;
+                themeListEl.appendChild(li);
+            }
+            
+            // イベントリスナーを設定
+            const checkboxes = document.querySelectorAll('#theme-list input[type="checkbox"]');
+            checkboxes.forEach(box => box.addEventListener('change', handleCheckboxChange));
+
+            // 画面切り替え
+            handleCheckboxChange(); // ボタンの状態を初期化
+            showScreen('screen-themes');
+        }
+
+        /** ステップ2: 大テーマ決定ボタン押下 */
+        async function confirmMainThemes() {
+            const checkedBoxes = document.querySelectorAll('#theme-list input[type="checkbox"]:checked');
+            selectedMainThemes = Array.from(checkedBoxes).map(box => box.value);
+            
+            if (selectedMainThemes.length !== 5) return; // ガード
+
+            currentSubthemeVersion = 1; // 最初の提案
+            await generateSubthemes();
+        }
+
+        /** ステップ3: 小テーマの生成と表示（再提案も含む） */
+        async function generateSubthemes() {
+            await fakeApiCall(1500); // APIから小テーマを取得するフリ
+
+            subthemeResultsEl.innerHTML = ""; // 初期化
+            finalThemesData = {}; // 最終データも初期化
+
+            const subthemeKey = `subthemes_${currentSubthemeVersion}`;
+
+            for (const themeId of selectedMainThemes) {
+                const themeData = API_DATA_STORE[themeId];
+                if (!themeData) continue;
+                
+                const subthemes = themeData[subthemeKey];
+                finalThemesData[themeId] = {
+                    title: themeData.title,
+                    subthemes: subthemes
+                };
+                
+                const container = document.createElement('div');
+                container.className = 'subtheme-container';
+                
+                const title = document.createElement('h3');
+                title.textContent = themeData.title;
+                container.appendChild(title);
+                
+                const ul = document.createElement('ul');
+                ul.className = 'subtheme-list';
+                subthemes.forEach(sub => {
+                    const li = document.createElement('li');
+                    li.textContent = sub;
+                    ul.appendChild(li);
+                });
+                container.appendChild(ul);
+                
+                subthemeResultsEl.appendChild(container);
+            }
+            
+            showScreen('screen-subthemes');
+        }
+
+        /** ステップ3: 小テーマ再提案ボタン押下 */
+        function retrySubthemes() {
+            // パターン1と2を切り替える
+            currentSubthemeVersion = (currentSubthemeVersion === 1) ? 2 : 1;
+            generateSubthemes();
+        }
+
+        /** ステップ3: 大テーマ再選択ボタン押下 */
+        function goBackToMainThemes() {
+            // チェックボックスの状態をリセット
+            const checkboxes = document.querySelectorAll('#theme-list input[type="checkbox"]');
+            checkboxes.forEach(box => {
+                box.checked = false;
+                box.disabled = false;
+            });
+            handleCheckboxChange(); // 状態をリセット
+            showScreen('screen-themes');
+        }
+        
+        /** ステップ4: 最終決定ボタン押下 */
+        function showFinalResult() {
+            finalResultContainerEl.innerHTML = ""; // 初期化
+            
+            for (const [id, data] of Object.entries(finalThemesData)) {
+                const container = document.createElement('div');
+                container.className = 'subtheme-container';
+                
+                const title = document.createElement('h3');
+                title.textContent = data.title;
+                container.appendChild(title);
+                
+                const ul = document.createElement('ul');
+                ul.className = 'subtheme-list';
+                data.subthemes.forEach(sub => {
+                    const li = document.createElement('li');
+                    li.textContent = sub;
+                    ul.appendChild(li);
+                });
+                container.appendChild(ul);
+                
+                finalResultContainerEl.appendChild(container);
+            }
+            
+            showScreen('screen-final');
+        }
+
+        /** ステップ4: 最初からやり直す */
+        function restartProcess() {
+            selectedMainThemes = [];
+            currentSubthemeVersion = 1;
+            finalThemesData = {};
+            showScreen('screen-start');
+        }
+
+        // --- イベントリスナーの初期設定 ---
+        btnStart.addEventListener('click', startProcess);
+        btnConfirmThemes.addEventListener('click', confirmMainThemes);
+        btnRetrySubthemes.addEventListener('click', retrySubthemes);
+        btnBackToMain.addEventListener('click', goBackToMainThemes);
+        btnConfirmFinal.addEventListener('click', showFinalResult);
+        btnRestart.addEventListener('click', restartProcess);
+
+    </script>
+
+</body>
+</html>
