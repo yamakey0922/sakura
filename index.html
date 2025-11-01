@@ -238,7 +238,7 @@
 
         <div id="screen-start" class="screen active">
             <p class="welcome-message">
-                参加者の実体験を引き出し、未来に向けた建設的な対話を生み出すためのアジェンダ作成をお手伝いします。
+                未来に向けた建設的な対話を生み出すためのアジェンダ作成をお手伝いします。
             </p>
             <button id="btn-start" class="button button-primary">スタート</button>
         </div>
@@ -254,7 +254,8 @@
 
         <div id="screen-subthemes" class="screen">
             <h2>生成された小テーマ</h2>
-            <p>選択した大テーマに基づき、以下の小テーマ（議論の切り口）を提案します。これでよろしいですか？</p>
+            <p>選択した大テーマに基づき、以下の小テーマ（議論の切り口）を提案します。</p>
+            <p>これでよろしいですか？</p>
             <div id="subtheme-results"></div>
             <div class="button-group">
                 <div>
@@ -422,7 +423,7 @@
             await fakeApiCall(1000); // APIから大テーマを取得するフリ
             
             // ステップ2の画面を構築
-            initialMessageEl.textContent = "このテーマで議論すべき『10個の大テーマ』を提案します。特に深く掘り下げたい、重要だと思うテーマを5つ選んでください。";
+            initialMessageEl.textContent = "以下の大テーマから、特に深く掘り下げたい・重要だと思うテーマを5つ選んでください。";
             themeListEl.innerHTML = ""; // 初期化
             
             for (const [id, data] of Object.entries(API_DATA_STORE)) {
