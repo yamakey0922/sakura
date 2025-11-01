@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>議論テーマ設計サポート</title>
+    <title>議論テーマ設計サポート (Live API)</title>
     
     <style>
         :root {
@@ -38,6 +38,7 @@
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             overflow: hidden;
+            position: relative; /* ローディング用 */
         }
 
         header {
@@ -72,6 +73,26 @@
             margin-bottom: 25px;
         }
 
+        #api-key-input {
+            width: calc(100% - 20px);
+            padding: 10px;
+            font-size: 1rem;
+            border: 1px solid var(--gray);
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        
+        .api-warning {
+            font-size: 0.85rem;
+            color: var(--danger-color);
+            margin-bottom: 20px;
+            text-align: left;
+            padding: 10px;
+            background-color: #fdf2f2;
+            border: 1px solid var(--danger-color);
+            border-radius: 4px;
+        }
+
         /* --- ローディング --- */
         .loading-overlay {
             display: none;
@@ -80,10 +101,11 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(255, 255, 255, 0.8);
+            background-color: rgba(255, 255, 255, 0.85);
             justify-content: center;
             align-items: center;
             z-index: 100;
+            text-align: center;
         }
         .loading-overlay.active {
             display: flex;
@@ -96,6 +118,13 @@
             height: 50px;
             animation: spin 1s linear infinite;
         }
+        .loading-message {
+            margin-top: 15px;
+            font-size: 1.1rem;
+            color: var(--dark-gray);
+            font-weight: 500;
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -127,6 +156,7 @@
             margin-right: 15px;
             width: 20px;
             height: 20px;
+            flex-shrink: 0;
         }
         .theme-item input[type="checkbox"]:checked + span {
             font-weight: bold;
@@ -223,24 +253,39 @@
         .button-group .right {
             margin-left: auto;
         }
+        
+        /* エラーメッセージ */
+        .error-message {
+            color: var(--danger-color);
+            background-color: #fdf2f2;
+            border: 1px solid var(--danger-color);
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none; /* 通常は非表示 */
+        }
     </style>
 </head>
 <body>
 
     <div id="app-container">
-        <header>
-            <h1>未来の職場づくり：議論テーマ設計サポート</h1>
-        </header>
-
         <div class="loading-overlay" id="loading-overlay">
-            <div class="spinner"></div>
+            <div>
+                <div class="spinner"></div>
+                <div class="loading-message" id="loading-message">LLMが応答中です...</div>
+            </div>
         </div>
 
         <div id="screen-start" class="screen active">
             <p class="welcome-message">
-                未来に向けた建設的な対話を生み出すためのアジェンダ作成をお手伝いします。
+                参加者の実体験を引き出し、未来に向けた建設的な対話を生み出すためのアジェンダ作成をお手伝いします。
             </p>
+            <div class="api-warning">
+                <strong>セキュリティ警告:</strong> APIキーはブラウザに保存されません。このウィンドウを閉じると消えます。公開サーバーでは絶対に使用しないでください。
+            </div>
+            <input type="text" id="api-key-input" placeholder="Google AI Studio APIキーを入力">
             <button id="btn-start" class="button button-primary">スタート</button>
+            <div class="error-message" id="start-error"></div>
         </div>
 
         <div id="screen-themes" class="screen">
@@ -250,12 +295,12 @@
             <div class="button-group">
                 <button id="btn-confirm-themes" class="button button-primary" disabled>小テーマを生成 (5/5)</button>
             </div>
+            <div class="error-message" id="themes-error"></div>
         </div>
 
         <div id="screen-subthemes" class="screen">
             <h2>生成された小テーマ</h2>
-            <p>選択した大テーマに基づき、以下の小テーマ（議論の切り口）を提案します。</p>
-            <p>これでよろしいですか？</p>
+            <p>選択した大テーマに基づき、以下の小テーマ（議論の切り口）を提案します。これでよろしいですか？</p>
             <div id="subtheme-results"></div>
             <div class="button-group">
                 <div>
@@ -264,6 +309,7 @@
                 </div>
                 <button id="btn-confirm-final" class="button button-primary right">OK (最終決定)</button>
             </div>
+            <div class="error-message" id="subthemes-error"></div>
         </div>
 
         <div id="screen-final" class="screen">
@@ -277,88 +323,39 @@
     </div>
 
     <script>
-        // --- APIシミュレーション用データ ---
-        // 本来、このデータはAPIから動的に取得します。
-        // ここでは2パターン（通常用と再提案用）をハードコードしています。
-        const API_DATA_STORE = {
-            "1": {
-                title: "キャリアとスキル開発",
-                subthemes_1: ["キャリアパスの多様性", "学び直しの機会", "日々の業務を通じた成長実感", "スキル習得支援の公平性", "技術者としての市場価値"],
-                subthemes_2: ["専門職vs管理職以外の道", "育休・時短中のスキルアップデート支援", "ストレッチアサインメントと裁量権", "学習予算と時間の確保", "社外でも通用する専門性の構築"]
-            },
-            "2": {
-                title: "評価と昇進の透明性",
-                subthemes_1: ["評価プロセスの透明性", "「見えにくい貢献」の可視化", "昇進・昇格プロセスの納得感", "ライフイベントと評価", "未来の「成果」の定義"],
-                subthemes_2: ["評価基準の明確化とフィードバック", "サポート業務や後輩育成の評価", "昇進の意思決定プロセスの開示", "休職・時短復帰後のキャリアパス", "時間ではなくアウトプット重視の評価"]
-            },
-            "3": {
-                title: "ワークライフ・インテグレーション",
-                subthemes_1: ["柔軟な勤務時間", "柔軟な勤務場所", "「時間制約」へのチームの理解", "仕事と私生活の「境界線」", "両立支援制度の「使いやすさ」"],
-                subthemes_2: ["フルフレックスや中抜け制度", "リモートと出社の最適バランス", "子育て・介護中の突発対応", "「つながらない権利」の担保", "制度の認知度と取得しやすい雰囲気"]
-            },
-            "4": {
-                title: "組織風土と心理的安全性",
-                subthemes_1: ["「異論」を歓迎する文化", "失敗から学ぶプロセス", "チーム内の情報格差", "「暗黙のルール」の存在", "雑談や相互理解の機会"],
-                subthemes_2: ["会議で反対意見を表明できるか", "挑戦した結果の失敗の許容", "リモートと出社間の情報共有", "昔からの慣習の見直し", "1on1の質とチームビルディング"]
-            },
-            "5": {
-                title: "アンコンシャス・バイアス（無意識の偏見）",
-                subthemes_1: ["日々の業務での役割分担", "発言機会の偏り", "過小評価・過大評価", "「女性だから」というラベリング", "多様な視点の欠如"],
-                subthemes_2: ["お茶汲み・雑務の偏り", "会議で誰の意見が通りやすいか", "特定の属性への固定観念", "マイクロアグレッションの事例共有", "意思決定層の多様性"]
-            },
-            "6": {
-                title: "ロールモデルとメンターシップ",
-                subthemes_1: ["目標となる先輩の存在", "相談できるメンター制度", "多様なロールモデルの必要性", "身近なロールモデルの不足", "次世代の育成"],
-                subthemes_2: ["多様なキャリアを歩む先輩", "形式的でないメンタリング", "「自分らしい」ロールモデル", "社外メンターの活用", "スポンサーシップ（引き上げ）"]
-            },
-            "7": {
-                title: "ネットワーキングと情報アクセス",
-                subthemes_1: ["組織内外のつながり", "重要な情報へのアクセスしやすさ", "孤立の防止", "部門横断のコミュニケーション", "非公式な情報ネットワーク"],
-                subthemes_2: ["社内コミュニティの活性化", "キーパーソンへのアクセス", "リモートワーク下の孤立感", "他部門との連携", "「飲み会」以外の情報交換"]
-            },
-            "8": {
-                title: "技術とツールの活用",
-                subthemes_1: ["業務効率化ツールの導入", "コラボレーションツールの活用", "スキル習得を支援する環境", "ツール利用の格差", "DXと働きやすさ"],
-                subthemes_2: ["AIや自動化による負荷軽減", "リモートでの円滑な協業", "Eラーニングやサンドボックス環境", "ITリテラシーのサポート", "デジタル化による柔軟な働き方"]
-            },
-            "9": {
-                title: "健康とウェルビーイング",
-                subthemes_1: ["心身の健康維持のサポート", "ハラスメント防止と対策", "働きがいとモチベーション", "過度な業務負荷", "メンタルヘルスケア"],
-                subthemes_2: ["産業医やカウンセリング", "パワハラ・セクハラの相談窓口", "エンゲージメントの測定と改善", "長時間労働の是正", "心理的負担の軽減"]
-            },
-            "10": {
-                title: "インクルーシブな意思決定",
-                subthemes_1: ["会議での発言機会の均等性", "重要なプロジェクトへのアサイン", "リーダーシップの多様性", "意思決定プロセスの透明化", "マイノリティ意見の尊重"],
-                subthemes_2: ["誰が会議をファシリテートするか", "主要プロジェクトのメンバー選定", "従来のリーダー像にとらわれない登用", "「いつの間にか決まる」の防止", "少数意見を拾う仕組み"]
-            }
-        };
-
         // --- DOM要素の取得 ---
         const screens = document.querySelectorAll('.screen');
         const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingMessage = document.getElementById('loading-message');
         
         const btnStart = document.getElementById('btn-start');
+        const apiKeyInput = document.getElementById('api-key-input');
+        const startError = document.getElementById('start-error');
         
         const screenThemes = document.getElementById('screen-themes');
         const initialMessageEl = document.getElementById('initial-message');
         const themeListEl = document.getElementById('theme-list');
         const selectionFeedbackEl = document.getElementById('selection-feedback');
         const btnConfirmThemes = document.getElementById('btn-confirm-themes');
+        const themesError = document.getElementById('themes-error');
 
         const screenSubthemes = document.getElementById('screen-subthemes');
         const subthemeResultsEl = document.getElementById('subtheme-results');
         const btnBackToMain = document.getElementById('btn-back-to-main');
         const btnRetrySubthemes = document.getElementById('btn-retry-subthemes');
         const btnConfirmFinal = document.getElementById('btn-confirm-final');
+        const subthemesError = document.getElementById('subthemes-error');
         
         const screenFinal = document.getElementById('screen-final');
         const finalResultContainerEl = document.getElementById('final-result-container');
         const btnRestart = document.getElementById('btn-restart');
 
         // --- 状態管理変数 ---
-        let selectedMainThemes = [];
-        let currentSubthemeVersion = 1; // 1 or 2 (再提案用)
+        let API_KEY = "";
+        let selectedMainThemeTitles = []; // 選択された大テーマの「文字列」を保持
         let finalThemesData = {}; // 最終決定したデータを保持
+        
+        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=";
 
         // --- 関数 ---
 
@@ -371,7 +368,8 @@
         }
         
         /** ローディングを表示/非表示 */
-        function showLoading(isLoading) {
+        function showLoading(isLoading, message = "LLMが応答中です...") {
+            loadingMessage.textContent = message;
             if (isLoading) {
                 loadingOverlay.classList.add('active');
             } else {
@@ -379,16 +377,82 @@
             }
         }
 
-        /** (シミュレート) API呼び出しを模倣する */
-        function fakeApiCall(duration) {
-            showLoading(true);
-            return new Promise(resolve => {
-                setTimeout(() => {
-                    showLoading(false);
-                    resolve();
-                }, duration);
+        /** エラーメッセージを表示 */
+        function showError(element, message) {
+            element.textContent = `エラー: ${message}`;
+            element.style.display = 'block';
+        }
+
+        /** エラーメッセージを非表示 */
+        function clearError(...elements) {
+            elements.forEach(el => {
+                el.textContent = "";
+                el.style.display = 'none';
             });
         }
+        
+        /** Gemini API呼び出し関数 */
+        async function callGeminiApi(prompt) {
+            if (!API_KEY) {
+                throw new Error("APIキーが設定されていません。");
+            }
+            
+            const url = `${API_URL}${API_KEY}`;
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: prompt }]
+                        }]
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || `HTTPエラー: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.candidates && data.candidates.length > 0) {
+                    const textResponse = data.candidates[0].content.parts[0].text;
+                    return parseJsonFromText(textResponse);
+                } else {
+                    throw new Error("LLMからの応答が空か、無効な形式です。");
+                }
+                
+            } catch (error) {
+                console.error("API呼び出しエラー:", error);
+                throw error; // エラーを呼び出し元に伝播させる
+            }
+        }
+        
+        /** LLMの応答テキストからJSONを抽出 */
+        function parseJsonFromText(text) {
+            // ```json ... ``` または ``` ... ``` ブロックを探す
+            const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+            
+            let jsonString = text;
+            if (match && match[1]) {
+                jsonString = match[1]; // 抽出したJSON文字列
+            }
+            
+            // JSON文字列内のエスケープされた改行などをクリーンアップ
+            jsonString = jsonString.replace(/\\n/g, "").replace(/\\/g, "");
+
+            try {
+                return JSON.parse(jsonString);
+            } catch (e) {
+                console.error("JSONのパースに失敗しました:", e, "元テキスト:", text);
+                throw new Error("LLMがJSON形式でないデータを返しました。");
+            }
+        }
+
 
         /** チェックボックスの選択状態を監視 */
         function handleCheckboxChange() {
@@ -405,10 +469,6 @@
                 // 5つ超えて選択できないようにする
                 const uncheckedBoxes = document.querySelectorAll('#theme-list input[type="checkbox"]:not(:checked)');
                 uncheckedBoxes.forEach(box => box.disabled = true);
-            } else if (count > 5) {
-                // 基本的にこのロジックには入らないはずだが、念のため
-                selectionFeedbackEl.textContent = `5つまでしか選択できません。`;
-                selectionFeedbackEl.classList.add('error');
             } else {
                 btnConfirmThemes.disabled = true;
                 btnConfirmThemes.textContent = `小テーマを生成 (${count}/5)`;
@@ -420,94 +480,162 @@
 
         /** ステップ1: スタートボタン押下 */
         async function startProcess() {
-            await fakeApiCall(1000); // APIから大テーマを取得するフリ
-            
-            // ステップ2の画面を構築
-            initialMessageEl.textContent = "以下の大テーマから、特に深く掘り下げたい・重要だと思うテーマを5つ選んでください。";
-            themeListEl.innerHTML = ""; // 初期化
-            
-            for (const [id, data] of Object.entries(API_DATA_STORE)) {
-                const li = document.createElement('li');
-                li.className = 'theme-item';
-                li.innerHTML = `
-                    <label>
-                        <input type="checkbox" value="${id}" name="main_theme">
-                        <span>${data.title}</span>
-                    </label>
-                `;
-                themeListEl.appendChild(li);
+            clearError(startError);
+            API_KEY = apiKeyInput.value.trim();
+            if (!API_KEY) {
+                showError(startError, "APIキーを入力してください。");
+                return;
             }
-            
-            // イベントリスナーを設定
-            const checkboxes = document.querySelectorAll('#theme-list input[type="checkbox"]');
-            checkboxes.forEach(box => box.addEventListener('change', handleCheckboxChange));
 
-            // 画面切り替え
-            handleCheckboxChange(); // ボタンの状態を初期化
-            showScreen('screen-themes');
+            showLoading(true, "大テーマを生成中です...");
+            
+            const prompt = `
+                あなたは「未来の職場づくり」のアジェンダ設計を専門とするコンサルタントです。
+                参加者は女性技術者です。
+                議論すべき「10個の大テーマ」を提案してください。
+
+                出力は必ず以下のJSON形式の配列だけにしてください。
+                ["テーマ1", "テーマ2", "テーマ3", "テーマ4", "テーマ5", "テーマ6", "テーマ7", "テーマ8", "テーマ9", "テーマ10"]
+            `;
+            
+            try {
+                const mainThemes = await callGeminiApi(prompt); // ["テーマ1", ...]
+
+                if (!Array.isArray(mainThemes) || mainThemes.length < 10) {
+                    throw new Error("LLMが10個のテーマを含む配列を返しませんでした。");
+                }
+                
+                // ステップ2の画面を構築
+                initialMessageEl.textContent = "LLMが提案した『10個の大テーマ』です。深く掘り下げたい5つを選んでください。";
+                themeListEl.innerHTML = ""; // 初期化
+                
+                mainThemes.forEach((themeTitle, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'theme-item';
+                    // valueにもテーマ名をそのまま入れる
+                    li.innerHTML = `
+                        <label>
+                            <input type="checkbox" value="${themeTitle}" name="main_theme">
+                            <span>${themeTitle}</span>
+                        </label>
+                    `;
+                    themeListEl.appendChild(li);
+                });
+                
+                // イベントリスナーを設定
+                const checkboxes = document.querySelectorAll('#theme-list input[type="checkbox"]');
+                checkboxes.forEach(box => box.addEventListener('change', handleCheckboxChange));
+
+                // 画面切り替え
+                handleCheckboxChange(); // ボタンの状態を初期化
+                showScreen('screen-themes');
+                
+            } catch (error) {
+                showError(startError, error.message);
+            } finally {
+                showLoading(false);
+            }
         }
 
         /** ステップ2: 大テーマ決定ボタン押下 */
         async function confirmMainThemes() {
+            clearError(themesError, subthemesError);
             const checkedBoxes = document.querySelectorAll('#theme-list input[type="checkbox"]:checked');
-            selectedMainThemes = Array.from(checkedBoxes).map(box => box.value);
+            // value (テーマ名の文字列) の配列を取得
+            selectedMainThemeTitles = Array.from(checkedBoxes).map(box => box.value);
             
-            if (selectedMainThemes.length !== 5) return; // ガード
+            if (selectedMainThemeTitles.length !== 5) return; // ガード
 
-            currentSubthemeVersion = 1; // 最初の提案
-            await generateSubthemes();
+            await generateSubthemes(false); // false = 再提案ではない
         }
 
         /** ステップ3: 小テーマの生成と表示（再提案も含む） */
-        async function generateSubthemes() {
-            await fakeApiCall(1500); // APIから小テーマを取得するフリ
-
-            subthemeResultsEl.innerHTML = ""; // 初期化
-            finalThemesData = {}; // 最終データも初期化
-
-            const subthemeKey = `subthemes_${currentSubthemeVersion}`;
-
-            for (const themeId of selectedMainThemes) {
-                const themeData = API_DATA_STORE[themeId];
-                if (!themeData) continue;
-                
-                const subthemes = themeData[subthemeKey];
-                finalThemesData[themeId] = {
-                    title: themeData.title,
-                    subthemes: subthemes
-                };
-                
-                const container = document.createElement('div');
-                container.className = 'subtheme-container';
-                
-                const title = document.createElement('h3');
-                title.textContent = themeData.title;
-                container.appendChild(title);
-                
-                const ul = document.createElement('ul');
-                ul.className = 'subtheme-list';
-                subthemes.forEach(sub => {
-                    const li = document.createElement('li');
-                    li.textContent = sub;
-                    ul.appendChild(li);
-                });
-                container.appendChild(ul);
-                
-                subthemeResultsEl.appendChild(container);
-            }
+        async function generateSubthemes(isRetry) {
+            showLoading(true, isRetry ? "小テーマを再提案中です..." : "小テーマを生成中です...");
             
-            showScreen('screen-subthemes');
+            const retryInstruction = isRetry ? "重要：これは再提案の依頼です。前回とは異なる切り口や表現の小テーマを5つずつ提案してください。" : "";
+            
+            const prompt = `
+                あなたは「未来の職場づくり」のアジェンダ設計を専門とするコンサルタントです。
+                参加者は女性技術者です。
+                以下の5つの大テーマについて、それぞれ議論を深めるための「5つの詳細な小テーマ（議論の切り口）」を提案してください。
+                
+                ${retryInstruction}
+
+                大テーマ:
+                ${selectedMainThemeTitles.map((t, i) => `${i + 1}. ${t}`).join('\n')}
+
+                出力は必ず以下のJSON形式だけにしてください。キーには提供された大テーマの文字列を正確に使用してください。
+                {
+                  "${selectedMainThemeTitles[0]}": ["小テーマ1", "小テーマ2", "小テーマ3", "小テーマ4", "小テーマ5"],
+                  "${selectedMainThemeTitles[1]}": ["小テーマ1", "小テーマ2", "小テーマ3", "小テーマ4", "小テーマ5"],
+                  "${selectedMainThemeTitles[2]}": ["小テーマ1", "小テーマ2", "小テーマ3", "小テーマ4", "小テーマ5"],
+                  "${selectedMainThemeTitles[3]}": ["小テーマ1", "小テーマ2", "小テーマ3", "小テーマ4", "小テーマ5"],
+                  "${selectedMainThemeTitles[4]}": ["小テーマ1", "小テーマ2", "小テーマ3", "小テーマ4", "小テーマ5"]
+                }
+            `;
+            
+            try {
+                const subthemeData = await callGeminiApi(prompt); // {"テーマ1": [...], ...}
+
+                subthemeResultsEl.innerHTML = ""; // 初期化
+                finalThemesData = {}; // 最終データも初期化
+
+                // selectedMainThemeTitles の順序を保持して構築する
+                for (const themeTitle of selectedMainThemeTitles) {
+                    const subthemes = subthemeData[themeTitle];
+                    
+                    if (!subthemes || !Array.isArray(subthemes) || subthemes.length === 0) {
+                        throw new Error(`LLMが「${themeTitle}」に対する小テーマ（配列）を返しませんでした。`);
+                    }
+                    
+                    finalThemesData[themeTitle] = {
+                        title: themeTitle,
+                        subthemes: subthemes
+                    };
+                    
+                    const container = document.createElement('div');
+                    container.className = 'subtheme-container';
+                    
+                    const title = document.createElement('h3');
+                    title.textContent = themeTitle;
+                    container.appendChild(title);
+                    
+                    const ul = document.createElement('ul');
+                    ul.className = 'subtheme-list';
+                    subthemes.forEach(sub => {
+                        const li = document.createElement('li');
+                        li.textContent = sub;
+                        ul.appendChild(li);
+                    });
+                    container.appendChild(ul);
+                    
+                    subthemeResultsEl.appendChild(container);
+                }
+                
+                showScreen('screen-subthemes');
+
+            } catch (error) {
+                // エラーが発生した画面に応じて表示
+                if (document.getElementById('screen-themes').classList.contains('active')) {
+                    showError(themesError, error.message);
+                } else {
+                    showError(subthemesError, error.message);
+                }
+            } finally {
+                showLoading(false);
+            }
         }
 
         /** ステップ3: 小テーマ再提案ボタン押下 */
         function retrySubthemes() {
-            // パターン1と2を切り替える
-            currentSubthemeVersion = (currentSubthemeVersion === 1) ? 2 : 1;
-            generateSubthemes();
+            clearError(themesError, subthemesError);
+            generateSubthemes(true); // true = 再提案
         }
 
         /** ステップ3: 大テーマ再選択ボタン押下 */
         function goBackToMainThemes() {
+            clearError(themesError, subthemesError);
             // チェックボックスの状態をリセット
             const checkboxes = document.querySelectorAll('#theme-list input[type="checkbox"]');
             checkboxes.forEach(box => {
@@ -522,34 +650,21 @@
         function showFinalResult() {
             finalResultContainerEl.innerHTML = ""; // 初期化
             
-            for (const [id, data] of Object.entries(finalThemesData)) {
-                const container = document.createElement('div');
-                container.className = 'subtheme-container';
-                
-                const title = document.createElement('h3');
-                title.textContent = data.title;
-                container.appendChild(title);
-                
-                const ul = document.createElement('ul');
-                ul.className = 'subtheme-list';
-                data.subthemes.forEach(sub => {
-                    const li = document.createElement('li');
-                    li.textContent = sub;
-                    ul.appendChild(li);
-                });
-                container.appendChild(ul);
-                
-                finalResultContainerEl.appendChild(container);
-            }
+            // subthemeResultsEl の内容をそのままクローンする（再構築の手間を省く）
+            const resultsClone = subthemeResultsEl.cloneNode(true);
+F            finalResultContainerEl.appendChild(resultsClone);
             
             showScreen('screen-final');
         }
 
         /** ステップ4: 最初からやり直す */
         function restartProcess() {
-            selectedMainThemes = [];
-            currentSubthemeVersion = 1;
+            // APIキーは保持する
+            selectedMainThemeTitles = [];
             finalThemesData = {};
+            clearError(startError, themesError, subthemesError);
+            
+            // スタート画面に戻る（APIキーは入力されたまま）
             showScreen('screen-start');
         }
 
