@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>議論起点ジェネレータ（女性技術者 × 未来の職場づくり）</title>
+<title>ディスカッション切り口提案AI（女性技術者 × 未来の職場づくり）</title>
 <style>
   :root{
     --bg:#0f1220; --panel:#16192b; --ink:#f3f5ff; --muted:#a8b0d8; --accent:#6ee7b7; --accent-2:#8ab4ff;
@@ -27,7 +27,7 @@
   .muted{color:var(--muted)}
   .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   input[type="text"],input[type="password"],select,textarea{
-    width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--divider);background:#0e1123;color:var(--ink);outline:none
+    width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--divider);background:#0e1123;color:#fff;outline:none
   }
   textarea{min-height:92px;resize:vertical}
   #context{min-height:240px;font-size:15px;line-height:1.5}
@@ -67,8 +67,8 @@
   <header>
     <div class="logo">AI</div>
     <div class="title">
-      <h1>話のネタ提供AI（女性技術者 × 未来の職場づくり）</h1>
-      <!-- <small class="muted">1ファイル完結版：HTML + CSS + JS（Gemini API を使用）。APIキーはブラウザ内だけで使用し保存しない。</small> -->
+      <h1>ディスカッション切り口提案AI（女性技術者 × 未来の職場づくり）</h1>
+      <!-- <small class="muted">1ファイル完結版：HTML + CSS + JS（Gemini API 使用）。APIキーはブラウザ内のみで使用し保存しない。</small> -->
     </div>
   </header>
 
@@ -114,7 +114,13 @@
     <div class="divider"></div>
     <div class="row">
       <button class="btn secondary" id="btnBackSetup">戻る</button>
-      <button class="btn" id="btnNextDetails" disabled><span class="spinner sr-only" id="spinNext"></span> 小テーマを生成する</button>
+      <!-- ★追加：大テーマの再提案ボタン -->
+      <button class="btn ghost" id="btnRegenThemes">
+        <span class="spinner sr-only" id="spinRegenThemes"></span> 大テーマの再提案
+      </button>
+      <button class="btn" id="btnNextDetails" disabled>
+        <span class="spinner sr-only" id="spinNext"></span> 小テーマを生成する
+      </button>
     </div>
   </section>
 
@@ -134,7 +140,7 @@
   <section id="view-final" class="panel" style="display:none">
     <div class="ok-banner">
       <div class="big">3) 最終表示</div>
-      <div class="hint">この内容で会合を開始できる。必要なら小テーマ再提案か大テーマ再選択で戻れる。</div>
+      <!-- <div class="hint">この内容で会合を開始できる。必要なら小テーマ再提案か大テーマ再選択で戻れる。</div> -->
     </div>
     <div class="final" id="finalRender" style="margin-top:12px"></div>
     <div class="divider"></div>
@@ -157,7 +163,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-/** ====== 定数（#1: モデル/創造性は固定・非表示） ====== **/
+/** ====== 定数（モデル/創造性は固定・非表示） ====== **/
 const DEFAULT_MODEL = "gemini-2.0-flash";
 const DEFAULT_TEMP  = 0.7;
 
@@ -223,6 +229,20 @@ function promptOpeningAndTen(context){
 }`;
 }
 
+function promptTenOnly(context){
+  return `
+次の要件でJSONを生成せよ。厳守：コードフェンス禁止・JSON以外の文字禁止。
+文脈: ${context || "汎用（参加者は女性技術者、時間60-90分）"}
+
+出力JSONスキーマ:
+{
+  "themes": [
+    {"id":"T1","title":"大テーマ名","aim":"1行のねらい","tags":["制度|運用|文化|会議|評価|キャリア|育成|働き方|情報|テック から2-3つ"]},
+    ... 合計10件（重複なし・軸が被りすぎない）
+  ]
+}`;
+}
+
 function promptFiveDetails(selectedThemes, context){
   const titles = selectedThemes.map((t,i)=>`${String.fromCharCode(65+i)}:${t.title}`).join(" / ");
   return `
@@ -257,8 +277,8 @@ function renderThemes(){
     card.innerHTML = `
       <input type="checkbox" id="th-${idx}" />
       <div>
-        <label for="th-${idx}" style="font-weight:700">${t.title}</label>
-        <div class="muted" style="margin:6px 0">${t.aim}</div>
+        <label for="th-${idx}" style="font-weight:700">${escapeHtml(t.title)}</label>
+        <div class="muted" style="margin:6px 0">${escapeHtml(t.aim)}</div>
         ${(t.tags||[]).map(tag=>`<span class="chip"><span class="tag">#${escapeHtml(tag)}</span></span>`).join(" ")}
       </div>`;
     host.appendChild(card);
@@ -354,7 +374,7 @@ qs("#btnStart").addEventListener("click", async ()=>{
     STATE.themes10 = Array.isArray(data.themes)? data.themes : [];
     if(STATE.themes10.length!==10) throw new Error("大テーマが10件ではありません。");
     hide("#view-setup"); show("#view-themes"); renderThemes();
-    qs("#openingText").textContent = STATE.opening || "ようこそ。未来の職場づくりに向けて、まず大テーマを選ぼう。";
+    qs("#openingText").textContent = STATE.opening || "ようこそ。未来の職場づくりに向けて、まず大テーマを選びましょう。";
     step(3);
   }catch(err){
     toast("取得に失敗: "+err.message); console.error(err);
@@ -366,6 +386,32 @@ qs("#btnStart").addEventListener("click", async ()=>{
 
 qs("#btnBackSetup").addEventListener("click", ()=>{
   hide("#view-themes"); show("#view-setup"); step(1);
+});
+
+/* ★追加：大テーマの再提案 */
+qs("#btnRegenThemes").addEventListener("click", async ()=>{
+  qs("#spinRegenThemes").classList.remove("sr-only");
+  overlay(true);
+  try{
+    const data = await callGeminiJSON({
+      apiKey: STATE.apiKey,
+      model: STATE.model,
+      temperature: Math.min(1.0, STATE.temp + 0.2), // 変化を少し増やす
+      systemText: SYSTEM_CORE,
+      userText: promptTenOnly(STATE.context)
+    });
+    const themes = Array.isArray(data.themes)? data.themes : [];
+    if(themes.length!==10) throw new Error("大テーマが10件ではありません。");
+    STATE.themes10 = themes;
+    renderThemes(); // 選択リセット・カウント更新を内包
+    toast("大テーマを再提案しました", true);
+  }catch(err){
+    toast("大テーマ再提案に失敗: "+err.message);
+    console.error(err);
+  }finally{
+    qs("#spinRegenThemes").classList.add("sr-only");
+    overlay(false);
+  }
 });
 
 qs("#btnNextDetails").addEventListener("click", async ()=>{
@@ -399,7 +445,7 @@ qs("#btnRegen").addEventListener("click", async ()=>{
   qs("#spinRegen").classList.remove("sr-only"); overlay(true);
   try{
     const data = await callGeminiJSON({
-      apiKey: STATE.apiKey, model: STATE.model, temperature: (STATE.temp+0.2),
+      apiKey: STATE.apiKey, model: STATE.model, temperature: Math.min(1.0,(STATE.temp+0.2)),
       systemText: SYSTEM_CORE,
       userText: promptFiveDetails(selectedThemes, STATE.context)
     });
@@ -429,11 +475,12 @@ step(1);
 </script>
 
 <!--
-メモ:
-- #1対応: モデル/創造性(temperature)はUIから削除し、DEFAULT_MODEL/DEFAULT_TEMPとして固定。
-- #2対応: 最終画面のJSON表示とコピー機能を削除。
+変更点:
+- モデル/創造性のUIを削除し、DEFAULT_MODEL/DEFAULT_TEMPで固定。
+- 最終画面のJSON表示を削除。
+- ★追加要件: 大テーマの再提案ボタン（btnRegenThemes）を実装。promptTenOnlyで10大テーマのみ再生成し、UIを更新。
 - Gemini API: https://ai.google.dev/api/generate-content
-- 本番運用はサーバープロキシ経由でキー秘匿推奨。
+- 本番はサーバープロキシ経由でキー秘匿推奨。
 -->
 </body>
 </html>
